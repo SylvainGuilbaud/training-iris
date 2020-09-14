@@ -10,6 +10,7 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 <Route Url="/import" Method="POST" Call="import"/>
 <Route Url="/namespaces" Method="GET" Call="GetNamespaces"/>
 <Route Url="/namespace" Method="POST" Call="createNamespace" />
+<Route Url="/namespace" Method="DELETE" Call="deleteNamespace" />
 <Route Url="/namespace/enable/:namespace" Method="GET" Call="enableNamespace" />
 <Route Url="/service" Method="GET" Call="service" />
 </Routes>
@@ -37,8 +38,9 @@ ClassMethod createNamespace() As %Status
     set json={}
     set payload={}.%FromJSON(%request.Content)
     set json.namespace=payload.namespace
-    set json.directory=##class(%Library.File).NormalizeDirectory(payload.directory)
-    
+    set json.directory=##class(%Library.File).NormalizeDirectory(payload.directory)_payload.namespace
+    set json.directory=##class(%Library.File).NormalizeDirectory(json.directory)
+
     try {
         set vars("NAMESPACE")=json.namespace
         set vars("DATABASEDIR")=json.directory
@@ -51,6 +53,45 @@ ClassMethod createNamespace() As %Status
     }
     set json.status=payload.namespace_" successfully created"
     do json.%ToJSON()
+    return sc
+}
+
+ClassMethod deleteNamespace() As %Status
+{
+    set sc=$$$OK
+    set ns=$namespace
+     zn "%SYS"
+    set %response.ContentType="application/json"
+    set json={}
+    set payload={}.%FromJSON(%request.Content)
+    set json.namespace=payload.namespace
+    set json.directory=##class(%Library.File).NormalizeDirectory(payload.directory)_payload.namespace
+    set json.directory=##class(%Library.File).NormalizeDirectory(json.directory)
+    
+    try {
+       
+        set:##Class(Config.Namespaces).Exists(json.namespace) sc=##Class(Config.Namespaces).Delete(json.namespace)
+        set:sc json.status=json.namespace_" successfully deleted"
+        set json.databases=[]
+        for dbType="_SRC","_DATA" {
+            set dbName=json.directory_json.namespace_dbType
+            set sc=##class(SYS.Database).DismountDatabase(dbName)
+            set sc=##class(SYS.Database).DeleteDatabase(dbName)
+            set sc=##class(Config.Databases).Delete(json.namespace_dbType)
+            do:sc json.databases.%Push(dbName_" successfully deleted")
+        }
+        
+        set json.deleted=##class(%Library.File).RemoveDirectoryTree(json.directory)
+
+        set sc=##class(Security.Applications).Delete("/csp/"_json.namespace)
+        set:sc json.CSPApplication="/csp/"_json.namespace_" successfully deleted"
+    } catch e {
+        set sc=e.AsStatus()
+        set msg="erreur durant la création de l'espace de noms "_json.namespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
+        do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
+    }
+    do json.%ToJSON()
+    zn ns
     return sc
 }
 

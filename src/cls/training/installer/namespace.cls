@@ -6,7 +6,6 @@ Class training.installer.namespace
 XData Install [ XMLNamespace = INSTALLER ]
 {
 <Manifest>
-
     <Log Text="Version d'IRIS ${VERSION}" Level="0"/>
     <!-- Check if NameSpace variable is valued -->
     <If Condition='$L("${NAMESPACE}")=0'>
@@ -34,7 +33,22 @@ XData Install [ XMLNamespace = INSTALLER ]
         
             <!-- Need to create equivalent value of Default application for [NAMESPACE]: /csp/healthshare/[namespace], see Edit Web application window in portal -->
             <CSPApplication Url="/csp/${NAMESPACE}" Directory="${CSPDIR}/${NAMESPACE}" AuthenticationMethods="64" IsNamespaceDefault="true" />
-
+            <!--<Import File="/Users/guilbaud/git/training-iris/src/cls/training" Flags="ck-d" IgnoreErrors="true" Recurse="true"/>
+            <Production Name="training.prod.NewProduction" AutoStart="true" >
+                 <Setting Item="training.service.REST"
+                          Target="Item"
+                            Setting="PoolSize"
+                            Value="0" />
+                  <Setting Item="training.service.REST"
+                          Target="Item"
+                            Setting="Enabled"
+                            Value="true" />  
+                   <Setting Item="training.service.REST"
+                          Target="Item"
+                            Setting="Host"
+                            Value="training.service.REST" />             
+                            </Production>
+                            --> 
         </Namespace>
 
 

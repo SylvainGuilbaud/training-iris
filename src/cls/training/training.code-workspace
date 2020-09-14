@@ -1,11 +1,7 @@
 {
-	"folders": [
-		{
-			"path": "../../.."
-		},
-		{
-			"path": "../../../../../is/irishealth/mgr"
-		}
-	],
-	"settings": {}
+    "folders": [
+        {
+            "path": "../../.."
+        }
+    ]
 }
