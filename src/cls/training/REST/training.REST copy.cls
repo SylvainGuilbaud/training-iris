@@ -7,7 +7,6 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 {
 <Routes>
 <Route Url="/" Method="GET" Call="version"/>
-<Route Url="/import" Method="POST" Call="import"/>
 <Route Url="/namespaces" Method="GET" Call="GetNamespaces"/>
 <Route Url="/namespace" Method="POST" Call="createNamespace" />
 <Route Url="/namespace/enable/:namespace" Method="GET" Call="enableNamespace" />
@@ -35,73 +34,24 @@ ClassMethod createNamespace() As %Status
     set sc=$$$OK
     set %response.ContentType="application/json"
     set json={}
-    set payload={}.%FromJSON(%request.Content)
-    set json.namespace=payload.namespace
-    set json.directory=##class(%Library.File).NormalizeDirectory(payload.directory)
+    set payload=%request.Content
+    set json.ContentSize=payload.Size
+    #; set json.namespace=namespace
     
-    try {
-        set vars("NAMESPACE")=json.namespace
-        set vars("DATABASEDIR")=json.directory
-        set sc=##class(training.installer.namespace).setup(.vars)
-          
-    } catch e {
-        set sc=e.AsStatus()
-        set msg="erreur durant la création de l'espace de noms "_namespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
-        do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
-    }
-    set json.status=payload.namespace_" successfully created"
-    do json.%ToJSON()
-    return sc
-}
-
-ClassMethod import() As %Status
-{
-    set sc=$$$OK
-    set %response.ContentType="application/json"
-    set json={}
-    set payload={}.%FromJSON(%request.Content)
-    
-    set json.server=payload.server
-    set json.port=payload.port
-    set json.sourceNamespace=payload.sourceNamespace
-    set json.targetNamespace=payload.targetNamespace
-    set ns=$namespace
-    try {
-        zn json.targetNamespace
-        set httpRequest=##class(%Net.HttpRequest).%New()
-        set httpRequest.Server=json.server
-        set httpRequest.Port=json.port
-        set httpRequest.Username="_system"
-        set httpRequest.Password="SYS"
-        set sc=httpRequest.Get("http://"_json.server_":"_json.port_"/source/export/"_json.sourceNamespace)
-
-        if $$$ISOK(sc) && $IsObject(httpRequest.HttpResponse.Data) {
-            set sc=##class(%SYSTEM.OBJ).LoadStream(httpRequest.HttpResponse.Data,"-d",.errors,.list)
-            do httpRequest.HttpResponse.Data.Rewind()
-            set json.export=httpRequest.HttpResponse.Data.Read(256)
-            set json.errors=[]
-            set key=$ORDER(errors(""))
-            while (key'="") {
-                do json.errors.%Push(key) 
-                set key = $ORDER(errors(key))
-            }
-            set json.list=[]
-            set key=$ORDER(list(""))
-            while (key'="") {
-                do json.list.%Push(key) 
-                set key = $ORDER(list(key))
-            }
-        }
+    #; set json.requestContent=payload.Read()
+    //set json.databasesDirectory=%request.{}.%FromJSON
+    #; try {
+    #;     set vars("NAMESPACE")=namespace
+    #;     set vars("DATABASEDIR")=""
+    #;     set sc=##class(training.installer.namespace).setup(.vars)
         
-    }
-    catch e {
-        set sc=e.AsStatus()
-        set msg="erreur durant la création de l'espace de noms "_namespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
-        do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
-    }
-    set json.status=json.sourceNamespace_" successfully imported in namespace "_json.targetNamespace_" from "_json.server
+    #; } catch e {
+    #;     set sc=e.AsStatus()
+    #;     set msg="erreur durant la création de l'espace de noms "_namespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
+    #;     do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
+    #; }
+    
     do json.%ToJSON()
-    zn ns
     return sc
 }
 
@@ -200,6 +150,22 @@ ClassMethod GetNamespaces() As %Status
         }
     }
     Quit tSC
+}
+
+/// Return a dump of the request object
+ClassMethod Request() As %Status
+{
+	Set %response.ContentType="text/plain"
+	Do $System.OBJ.Dump(%request)
+    Quit $$$OK
+}
+
+/// Return the posted data
+ClassMethod Echo() As %Status
+{
+    Set %response.ContentType=%request.ContentType
+    
+    Quit %request.Content.OutputToDevice()
 }
 
 }
