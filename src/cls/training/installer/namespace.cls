@@ -18,12 +18,15 @@ XData Install [ XMLNamespace = INSTALLER ]
             <Arg Value="Le répertoire des bases de données est obligatoire"/>
         </Error>
     </If>
+    <If Condition='$L("${INTEROP}")=0'>
+        <Var Name="INTEROP" Value="0" />
+    </If>
     <!-- If exist do nothing, else create namespace -->
     <If Condition='(##class(Config.Namespaces).Exists("${NAMESPACE}")=0)'>
         <Log Text="Creating namespace ${NAMESPACE}" Level="0"/>
 
         <!-- temp hack, our data database goes into pre-existing and persisted USER database -->
-        <Namespace Name="${NAMESPACE}" Create="yes" Code="${NAMESPACE}_SRC" Ensemble="1" Data="${NAMESPACE}_DATA">
+        <Namespace Name="${NAMESPACE}" Create="yes" Code="${NAMESPACE}_SRC" Ensemble="${INTEROP}" Data="${NAMESPACE}_DATA">
             <Configuration>
                 <!-- sources are not presisted but kept in the container/image (done on purpose) -->
                 <Database Name="${NAMESPACE}_SRC" Dir="${DATABASEDIR}${NAMESPACE}_SRC" Create="yes" Resource="%DB_${NAMESPACE}_SRC"/>

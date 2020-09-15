@@ -12,7 +12,9 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 <Route Url="/namespace" Method="POST" Call="createNamespace" />
 <Route Url="/namespace" Method="DELETE" Call="deleteNamespace" />
 <Route Url="/namespace/enable/:namespace" Method="GET" Call="enableNamespace" />
+<Route Url="/namespace/disable/:namespace" Method="GET" Call="disableNamespace" />
 <Route Url="/service" Method="GET" Call="service" />
+<Route Url="/production" Method="POST" Call="createProduction" />
 </Routes>
 }
 
@@ -40,18 +42,27 @@ ClassMethod createNamespace() As %Status
     set json.namespace=payload.namespace
     set json.directory=##class(%Library.File).NormalizeDirectory(payload.directory)_payload.namespace
     set json.directory=##class(%Library.File).NormalizeDirectory(json.directory)
+    set json.interop=payload.interop
 
     try {
+        set ns=$namespace
+        zn "%sys"
+        if ##Class(Config.Namespaces).Exists(json.namespace) {
+            set alreadyExist = ##class(%Exception.General).%New("ALREADY EXIST","5001",,
+                             json.namespace_" is already existing")
+            throw alreadyExist
+        }
+        zn ns
         set vars("NAMESPACE")=json.namespace
         set vars("DATABASEDIR")=json.directory
+        set vars("INTEROP")=json.interop
         set sc=##class(training.installer.namespace).setup(.vars)
-          
+        set json.status=json.namespace_" successfully created"  
     } catch e {
         set sc=e.AsStatus()
-        set msg="erreur durant la création de l'espace de noms "_namespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
+        set msg="erreur durant la création de l'espace de noms "_json.namespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
         do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
     }
-    set json.status=payload.namespace_" successfully created"
     do json.%ToJSON()
     return sc
 }
@@ -60,7 +71,7 @@ ClassMethod deleteNamespace() As %Status
 {
     set sc=$$$OK
     set ns=$namespace
-     zn "%SYS"
+    zn "%SYS"
     set %response.ContentType="application/json"
     set json={}
     set payload={}.%FromJSON(%request.Content)
@@ -154,9 +165,31 @@ ClassMethod enableNamespace(namespace As %String) As %Status
     set json.namespace=namespace
     
     try {
-        if '##class(%Library.EnsembleMgr).IsEnsembleNamespace(namespace){
+        #; if '##class(%Library.EnsembleMgr).IsEnsembleNamespace(namespace){
             set sc=##class(%Library.EnsembleMgr).EnableNamespace(namespace,0)
-            set json.status="success"
+            set json.status=namespace_" successfully enabled to function with interoperability"
+        #; }        
+    } catch e {
+        set sc=e.AsStatus()
+        set msg="erreur durant la création de l'espace de noms "_namespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
+        do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
+    }
+    
+    do json.%ToJSON()
+    return sc
+}
+
+ClassMethod disableNamespace(namespace As %String) As %Status
+{
+    set sc=$$$OK
+    set %response.ContentType="application/json"
+    set json={}
+    set json.namespace=namespace
+    
+    try {
+        if ##class(%Library.EnsembleMgr).IsEnsembleNamespace(namespace){
+            set sc=##class(%Library.EnsembleMgr).DisableNamespace(namespace,0)
+            set json.status=namespace_" successfully disabled to function with interoperability"
         }        
     } catch e {
         set sc=e.AsStatus()
@@ -164,6 +197,75 @@ ClassMethod enableNamespace(namespace As %String) As %Status
         do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
     }
     
+    do json.%ToJSON()
+    return sc
+}
+
+ClassMethod createProduction() As %Status
+{
+    set sc=$$$OK
+    set %response.ContentType="application/json"
+    set json={}
+    set payload={}.%FromJSON(%request.Content)
+    set json.namespace=payload.namespace
+    set json.production=payload.production
+    
+
+    try {
+        set ns=$Namespace
+        zn json.namespace
+        if ##Class(Ens.Config.Production).%ExistsId(json.production) {
+            set alreadyExist = ##class(%Exception.General).%New("ALREADY EXIST","5001",,
+                             json.production_" is already existing in "_json.namespace)
+            throw alreadyExist
+        }
+        set a=##class(%Dictionary.ClassDefinition).%New()
+        set a.Name=json.production
+        set a.Super="Ens.Production"
+        set sc=a.%Save()
+
+        set prod=##class(Ens.Config.Production).%New()
+        set prod.Name=json.production
+        
+        set service=##class(Ens.Config.Item).%New()
+        set service.Name="from a file"
+        set service.ClassName="EnsLib.File.PassthroughService"
+        set target=##class(Ens.Config.Setting).%New()
+        set target.Name="TargetConfigNames"
+        set target.Value="router"
+        do service.Settings.Insert(target)
+        set FilePath=##class(Ens.Config.Setting).%New()
+        set FilePath.Name="FilePath"
+        set FilePath.Value="/file/in"
+        do service.Settings.Insert(FilePath)
+        set FileSpec=##class(Ens.Config.Setting).%New()
+        set FileSpec.Name="FileSpec"
+        set FileSpec.Value="*.txt"
+        do service.Settings.Insert(FileSpec)
+
+        do prod.Items.Insert(service)
+
+        set process=##class(Ens.Config.Item).%New()
+        set process.Name="router"
+        set process.ClassName="EnsLib.MsgRouter.RoutingEngine"
+        do prod.Items.Insert(process)
+
+        set operation=##class(Ens.Config.Item).%New()
+        set operation.Name="to a file"
+        set operation.ClassName="EnsLib.File.PassthroughOperation"
+        do prod.Items.Insert(operation)
+        
+        set sc=prod.%Save()
+
+       
+
+        set json.status=json.production_" successfully created in "_json.namespace_" ("_sc_")"
+        zn ns
+    } catch e {
+        set sc=e.AsStatus()
+        set msg="erreur durant la création de la production "_json.production_"("_$system.Status.GetErrorText(sc)_")",severity=1
+        do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
+    }
     do json.%ToJSON()
     return sc
 }
