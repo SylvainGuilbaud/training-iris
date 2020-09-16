@@ -9,9 +9,11 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 <Route Url="/" Method="GET" Call="version"/>
 <Route Url="/import" Method="POST" Call="import"/>
 <Route Url="/namespaces" Method="GET" Call="GetNamespaces"/>
+<Route Url="/namespace/exist/:namespace" Method="GET" Call="namespaceExists"/>
 <Route Url="/namespace" Method="POST" Call="createNamespace" />
 <Route Url="/namespace" Method="DELETE" Call="deleteNamespace" />
 <Route Url="/namespace/enable/:namespace" Method="GET" Call="enableNamespace" />
+<Route Url="/namespace/enable/:namespace" Method="PUT" Call="enableNamespace" />
 <Route Url="/namespace/disable/:namespace" Method="GET" Call="disableNamespace" />
 <Route Url="/service" Method="GET" Call="service" />
 <Route Url="/production" Method="POST" Call="createProduction" />
@@ -47,7 +49,7 @@ ClassMethod createNamespace() As %Status
     try {
         set ns=$namespace
         zn "%sys"
-        if ##Class(Config.Namespaces).Exists(json.namespace) {
+        if ..namespaceExists(json.namespace) {
             set alreadyExist = ##class(%Exception.General).%New("ALREADY EXIST","5001",,
                              json.namespace_" is already existing")
             throw alreadyExist
@@ -81,7 +83,7 @@ ClassMethod deleteNamespace() As %Status
     
     try {
        
-        set:##Class(Config.Namespaces).Exists(json.namespace) sc=##Class(Config.Namespaces).Delete(json.namespace)
+        set:..namespaceExists(json.namespace) sc=##Class(Config.Namespaces).Delete(json.namespace)
         set:sc json.status=json.namespace_" successfully deleted"
         set json.databases=[]
         for dbType="_SRC","_DATA" {
@@ -119,6 +121,7 @@ ClassMethod import() As %Status
     set json.targetNamespace=payload.targetNamespace
     set ns=$namespace
     try {
+        // check if namespace exist !!
         zn json.targetNamespace
         set httpRequest=##class(%Net.HttpRequest).%New()
         set httpRequest.Server=json.server
@@ -126,7 +129,7 @@ ClassMethod import() As %Status
         set httpRequest.Username="_system"
         set httpRequest.Password="SYS"
         set sc=httpRequest.Get("http://"_json.server_":"_json.port_"/source/export/"_json.sourceNamespace)
-
+        // localhost:57772/source/export/user
         if $$$ISOK(sc) && $IsObject(httpRequest.HttpResponse.Data) {
             set sc=##class(%SYSTEM.OBJ).LoadStream(httpRequest.HttpResponse.Data,"-d",.errors,.list)
             do httpRequest.HttpResponse.Data.Rewind()
@@ -291,6 +294,15 @@ ClassMethod service() As %Status
 		throw e
 	}
 	return sc
+}
+
+ClassMethod namespaceExists(namespace As %String) As %Boolean
+{
+    set ns=$Namespace
+    zn "%sys"
+    set exist=##Class(Config.Namespaces).Exists(namespace)
+    zn ns
+    return exist
 }
 
 /// This method returns a list of namespaces for this server
