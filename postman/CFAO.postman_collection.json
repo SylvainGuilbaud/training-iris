@@ -52,7 +52,7 @@
 			"response": []
 		},
 		{
-			"name": "export ENSEMBLE",
+			"name": "export classes from ENSEMBLE",
 			"request": {
 				"auth": {
 					"type": "basic",
@@ -87,7 +87,59 @@
 			"response": []
 		},
 		{
-			"name": "export IRIS",
+			"name": "export data from ENSEMBLE",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "SYS",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "_system",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "[\"Ens.Conf.CredentialsD\",\"^Ens.Util.LogD\"]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:57772/source/export/data/demo",
+					"host": [
+						"localhost"
+					],
+					"port": "57772",
+					"path": [
+						"source",
+						"export",
+						"data",
+						"demo"
+					],
+					"query": [
+						{
+							"key": "a",
+							"value": "1",
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export classes from IRIS",
 			"request": {
 				"auth": {
 					"type": "basic",
@@ -107,7 +159,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "localhost:52774/source/export/dev",
+					"raw": "localhost:52774/source/export/retail",
 					"host": [
 						"localhost"
 					],
@@ -115,14 +167,103 @@
 					"path": [
 						"source",
 						"export",
-						"dev"
+						"retail"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "import",
+			"name": "export data from IRIS",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "SYS",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "_system",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "[\n \"Ens.Conf.CredentialsD\",\n \"Sample.PersonD\",\n \"Aviation.EventD\"\n ]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:57772/source/export/data/demo",
+					"host": [
+						"localhost"
+					],
+					"port": "57772",
+					"path": [
+						"source",
+						"export",
+						"data",
+						"demo"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "import classes to IRIS",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "SYS",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "_system",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"server\":\"localhost\",\n    \"port\":\"57772\",\n    \"sourceNamespace\":\"samples\",\n    \"targetNamespace\":\"a0\"\n    }",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:52774/training/import",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "52774",
+					"path": [
+						"training",
+						"import"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "import data to IRIS",
 			"request": {
 				"auth": {
 					"type": "basic",

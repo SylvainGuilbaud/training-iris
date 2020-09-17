@@ -8,6 +8,7 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 <Routes>
 <Route Url="/" Method="GET" Call="version"/>
 <Route Url="/import" Method="POST" Call="import"/>
+<Route Url="/import/data" Method="POST" Call="importGlobals"/>
 <Route Url="/namespaces" Method="GET" Call="GetNamespaces"/>
 <Route Url="/namespace/exist/:namespace" Method="GET" Call="namespaceExists"/>
 <Route Url="/namespace" Method="POST" Call="createNamespace" />
@@ -17,6 +18,7 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 <Route Url="/namespace/disable/:namespace" Method="GET" Call="disableNamespace" />
 <Route Url="/service" Method="GET" Call="service" />
 <Route Url="/production" Method="POST" Call="createProduction" />
+<Route Url="/_spec" Method="GET" Call="SwaggerSpec" />
 </Routes>
 }
 
@@ -115,8 +117,8 @@ ClassMethod import() As %Status
     set json={}
     set payload={}.%FromJSON(%request.Content)
     
-    set json.server=payload.server
-    set json.port=payload.port
+    set json.sourceServer=payload.server
+    set json.sourcePort=payload.port
     set json.sourceNamespace=payload.sourceNamespace
     set json.targetNamespace=payload.targetNamespace
     set ns=$namespace
@@ -124,11 +126,11 @@ ClassMethod import() As %Status
         // check if namespace exist !!
         zn json.targetNamespace
         set httpRequest=##class(%Net.HttpRequest).%New()
-        set httpRequest.Server=json.server
-        set httpRequest.Port=json.port
+        set httpRequest.Server=json.sourceServer
+        set httpRequest.Port=json.sourcePort
         set httpRequest.Username="_system"
         set httpRequest.Password="SYS"
-        set sc=httpRequest.Get("http://"_json.server_":"_json.port_"/source/export/"_json.sourceNamespace)
+        set sc=httpRequest.Get("http://"_json.sourceServer_":"_json.sourcePort_"/source/export/"_json.sourceNamespace)
         // localhost:57772/source/export/user
         if $$$ISOK(sc) && $IsObject(httpRequest.HttpResponse.Data) {
             set sc=##class(%SYSTEM.OBJ).LoadStream(httpRequest.HttpResponse.Data,"-d",.errors,.list)
@@ -151,10 +153,64 @@ ClassMethod import() As %Status
     }
     catch e {
         set sc=e.AsStatus()
-        set msg="erreur durant la création de l'espace de noms "_namespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
+        set msg="erreur durant l'import vers l'espace de noms "_json.targetNamespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
         do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
     }
-    set json.status=json.sourceNamespace_" successfully imported in namespace "_json.targetNamespace_" from "_json.server
+    set json.status=json.sourceNamespace_" successfully imported in namespace "_json.targetNamespace_" from "_json.sourceServer
+    do json.%ToJSON()
+    zn ns
+    return sc
+}
+
+ClassMethod importGlobals() As %Status
+{
+    set sc=$$$OK
+    set %response.ContentType="application/json"
+    set json={}
+    set payload={}.%FromJSON(%request.Content)
+    
+    set json.sourceServer=payload.server
+    set json.sourcePort=payload.port
+    set json.sourceNamespace=payload.sourceNamespace
+    set json.targetNamespace=payload.targetNamespace
+    set json.globals=payload.globals
+    set ns=$namespace
+    try {
+        // check if namespace exist !!
+        zn json.targetNamespace
+        set httpRequest=##class(%Net.HttpRequest).%New()
+        set httpRequest.Server=json.sourceServer
+        set httpRequest.Port=json.sourcePort
+        set httpRequest.Username="_system"
+        set httpRequest.Password="SYS"
+        do HttpRequest.EntityBody.Write(json.globals.%ToJSON())
+        set sc=httpRequest.Get("http://"_json.sourceServer_":"_json.sourcePort_"/source/export/"_json.sourceNamespace)
+        // localhost:57772/source/export/data/user
+        if $$$ISOK(sc) && $IsObject(httpRequest.HttpResponse.Data) {
+            set sc=##class(%SYSTEM.OBJ).LoadStream(httpRequest.HttpResponse.Data,"-d",.errors,.list)
+            do httpRequest.HttpResponse.Data.Rewind()
+            set json.export=httpRequest.HttpResponse.Data.Read(256)
+            set json.errors=[]
+            set key=$ORDER(errors(""))
+            while (key'="") {
+                do json.errors.%Push(key) 
+                set key = $ORDER(errors(key))
+            }
+            set json.list=[]
+            set key=$ORDER(list(""))
+            while (key'="") {
+                do json.list.%Push(key) 
+                set key = $ORDER(list(key))
+            }
+        }
+        
+    }
+    catch e {
+        set sc=e.AsStatus()
+         set msg="erreur durant l'import de données vers l'espace de noms "_json.targetNamespace_"("_$system.Status.GetErrorText(sc)_")",severity=1
+       do ##class(%SYS.System).WriteToConsoleLog(msg,0,severity)
+    }
+    set json.status=json.sourceNamespace_" successfully imported in namespace "_json.targetNamespace_" from "_json.sourceServer
     do json.%ToJSON()
     zn ns
     return sc
@@ -355,6 +411,17 @@ ClassMethod GetNamespaces() As %Status
         }
     }
     Quit tSC
+}
+
+ClassMethod SwaggerSpec() As %Status
+{
+  Set tSC = ##class(%REST.API).GetWebRESTApplication($NAMESPACE, %request.Application, .swagger)
+  Do swagger.info.%Remove("x-ISC_Namespace")
+  Set swagger.basePath = "/crud"
+  Set swagger.info.title = "InterSystems IRIS REST CRUD demo"
+  Set swagger.info.version = "0.1"
+  Set swagger.host = "localhost:52773"
+  Return ..%ProcessResult($$$OK, swagger)
 }
 
 }
